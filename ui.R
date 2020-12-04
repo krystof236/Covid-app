@@ -26,8 +26,10 @@ navbarPage(
              DTOutput("data_grp_continent_dt"),
              DTOutput("data_drilled_dt")
     ), #tabPanel grouped data
-    tabPanel(title = "Map"),
-    tabPanel(title = "Forecast"),
-    tabPanel("Correlation analysis"),
-    tabPanel("Codebook")
+    tabPanel(title = "Map",
+             h3("Data visualization using leaflet package")),
+    tabPanel(title = "Forecast",
+             h3("Forecasting using forecast package")),
+    tabPanel(title = "Correlation analysis"),
+    tabPanel(title = "Codebook")
 )
