@@ -12,6 +12,7 @@ navbarPage(
                      uiOutput("country_filter"),
                      uiOutput("possible_vars_to_plot"),
                      uiOutput("multiple_vars_to_plot"),
+                     uiOutput("max_date_info"),
                      tags$a("Source of data", href = "https://github.com/owid/covid-19-data/tree/master/public/data")
                  ),
                  mainPanel(
@@ -28,7 +29,6 @@ navbarPage(
              DTOutput("data_drilled_dt")
     ), #tabPanel grouped data
     tabPanel(title = "Map",
-             uiOutput("max_date_info"),
              leafletOutput("map", height = 800)
     ),
     tabPanel(title = "Forecast",

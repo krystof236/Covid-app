@@ -14,6 +14,34 @@ data <- rio::import("data/owid-covid-data.csv") #static data in /data folder
 
 data <- data %>% 
   mutate(date = as.Date(date))
+max_date <- max(data$date)
+avail_countries <- data %>% distinct(location) %>% arrange(location)
+
+# adding computed variables -----------------------------------------------
+my_trailing_mean <- function(x, n = 7){stats::filter(x, rep(1/n,n), sides = 1)}
+
+data <- data %>%
+  group_by(location) %>% 
+  mutate(week_rel_new_inc_now = new_cases/lag(new_cases, order_by = date, n = 7),
+         week_rel_new_inc_now = ifelse(is.infinite(week_rel_new_inc_now), NA, week_rel_new_inc_now),
+         #week_rel_tot_inc_wago = lag(total_cases, order_by = date, n = 6)/lag(total_cases, order_by = date, n = 13),
+         week_rel_new_inc_wago = lag(week_rel_new_inc_now, order_by = date, n = 6),
+         week_rel_new_inc_wago = ifelse(is.infinite(week_rel_new_inc_wago), NA, week_rel_new_inc_wago),
+         avg_week_new_cases = my_trailing_mean(new_cases),
+         adjusted_weekly_increase = (new_cases/new_tests)/(lag(new_cases, order_by = date, n = 7)/lag(new_tests, order_by = date, n = 7)),
+         adjusted_weekly_increase = ifelse(is.infinite(adjusted_weekly_increase), NA, adjusted_weekly_increase))
+
+
+# data %>% filter(location == "Czech Republic") %>%
+#   ungroup() %>%
+#   select(date, week_rel_new_inc_wago) %>%
+#   arrange(desc(week_rel_new_inc_wago))
+# 
+# data %>% filter(location == "Czech Republic",
+#                 date < "2020-03-20") %>%
+#   select(date, total_cases, new_cases, total_tests, new_tests, adjusted_weekly_increase) %>% view
+
+# variables for a smaller dataset -----------------------------------------
 vars_small <- c("iso_code",
                 "continent",
                 "location",
@@ -26,12 +54,14 @@ vars_small <- c("iso_code",
                 "new_cases_per_million",
                 "total_deaths_per_million",
                 "new_deaths_per_million",
-                "reproduction_rate")
+                "reproduction_rate",
+                "week_rel_new_inc_now",
+                "week_rel_new_inc_wago",
+                "avg_week_new_cases",
+                "adjusted_weekly_increase")
+
 data_small <- data %>%
   select(all_of(vars_small))
-
-avail_countries <- data %>% distinct(location) %>% arrange(location)
-max_date <- max(data$date)
 
 
 # possible variables to plot preparation ----------------------------------
@@ -41,7 +71,11 @@ possible_vars_to_plot <- tribble(
   "New cases", "new_cases",
   "Total deaths", "total_deaths",
   "New deaths", "new_deaths",
-  "Reproduction rate", "reproduction_rate")
+  "Reproduction rate", "reproduction_rate",
+  "Weekly relative increase", "week_rel_new_inc_now",
+  "Weekly relative increase 1 week ago", "week_rel_new_inc_wago",
+  "7-day average of new cases", "avg_week_new_cases",
+  "Adjusted weekly increase", "adjusted_weekly_increase")
 
 
 # map data file preparation ---------------------------------------------------
@@ -241,7 +275,7 @@ function(input, output) {
   })
 
 # map, leaflet ------------------------------------------------------------
-  output$max_date_info <- renderText(paste("Map based on data from ", max_date))
+  output$max_date_info <- renderText(paste("Data from ", max_date))
   
   data_small_now_map <- data_small %>%
       filter(date == max_date) %>% 
