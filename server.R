@@ -31,16 +31,6 @@ data <- data %>%
          adjusted_weekly_increase = (new_cases/new_tests)/(lag(new_cases, order_by = date, n = 7)/lag(new_tests, order_by = date, n = 7)),
          adjusted_weekly_increase = ifelse(is.infinite(adjusted_weekly_increase), NA, adjusted_weekly_increase))
 
-
-# data %>% filter(location == "Czech Republic") %>%
-#   ungroup() %>%
-#   select(date, week_rel_new_inc_wago) %>%
-#   arrange(desc(week_rel_new_inc_wago))
-# 
-# data %>% filter(location == "Czech Republic",
-#                 date < "2020-03-20") %>%
-#   select(date, total_cases, new_cases, total_tests, new_tests, adjusted_weekly_increase) %>% view
-
 # variables for a smaller dataset -----------------------------------------
 vars_small <- c("iso_code",
                 "continent",
@@ -117,9 +107,8 @@ function(input, output) {
   
   # filtered_data_small <- data_small %>% filter(location == "Czech Republic")
   p_cases <- reactive({
-    max_y <- reactive(max(filtered_data_small()[[input$var_to_plot]], na.rm = T))
     var_label <- possible_vars_to_plot %>% filter(value == input$var_to_plot) %>% select(label) %>% as.character()
-    ggplot(filtered_data_small(),
+    temp <- ggplot(filtered_data_small(),
            aes(x = date, y = .data[[input$var_to_plot]], group = location, color = location,
                text = paste0(
                  var_label, ': ', .data[[input$var_to_plot]],
@@ -129,9 +118,11 @@ function(input, output) {
            )
     )+
       geom_line()+
-      scale_y_continuous(breaks = seq(0,max_y(), 10^(floor(log10(max_y())))), labels = comma)+
       scale_x_date(date_labels = "%b %Y", date_breaks = "1 month")+
       labs(x = "Date", y = var_label, title = paste0("Single variable - ", var_label," time series"), color = "Country")
+    
+    if (input$scale_type == "log") {temp + scale_y_log10(labels = comma)}
+    else {temp+scale_y_continuous(labels = comma)}
   })
   output$p_cases_pl <- renderPlotly({
     req(input$country)
@@ -159,10 +150,12 @@ function(input, output) {
                                                    '<br> Date: ', date
                                                  )))
     }
-    graphs[[no_layers+1]]+
+    temp <- graphs[[no_layers+1]]+
       labs(title = "Multiple variables", x = "Date", y = "", color = "Country")+
-      scale_x_date(date_labels = "%b %Y", date_breaks = "1 month")+
-      scale_y_continuous(labels = comma)
+      scale_x_date(date_labels = "%b %Y", date_breaks = "1 month")
+    
+    if (input$scale_type == "log") {temp + scale_y_log10(labels = comma)}
+    else {temp+scale_y_continuous(labels = comma)}
   })
   
   output$p_mult_pl <- renderPlotly({

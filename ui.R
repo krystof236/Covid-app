@@ -11,6 +11,7 @@ navbarPage(
                  sidebarPanel(
                      uiOutput("country_filter"),
                      uiOutput("possible_vars_to_plot"),
+                     radioButtons("scale_type", "Scale", choices = c("Linear" = "lin", "Logarithmic" = "log")),
                      uiOutput("multiple_vars_to_plot"),
                      uiOutput("max_date_info"),
                      tags$a("Source of data", href = "https://github.com/owid/covid-19-data/tree/master/public/data")
