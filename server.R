@@ -29,7 +29,8 @@ data <- data %>%
          week_rel_new_inc_wago = ifelse(is.infinite(week_rel_new_inc_wago), NA, week_rel_new_inc_wago),
          avg_week_new_cases = my_trailing_mean(new_cases),
          adjusted_weekly_increase = (new_cases/new_tests)/(lag(new_cases, order_by = date, n = 7)/lag(new_tests, order_by = date, n = 7)),
-         adjusted_weekly_increase = ifelse(is.infinite(adjusted_weekly_increase), NA, adjusted_weekly_increase))
+         adjusted_weekly_increase = ifelse(is.infinite(adjusted_weekly_increase), NA, adjusted_weekly_increase)) %>% 
+  ungroup() #could cause some issues further down
 
 # variables for a smaller dataset -----------------------------------------
 vars_small <- c("iso_code",
