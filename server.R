@@ -9,12 +9,10 @@ library(geojsonio)
 # library(rgdal) #needed for shapefile map format
 
 # data preparation --------------------------------------------------------
-#data <- rio::import("data/owid-covid-data.csv") #static data in /data folder
-#data <- rio::import("data_shinyapps/owid-covid-data.csv") #when publishing to shinyapps
+#data <- rio::import("data_shinyapps/owid-covid-data.csv") #using static data, when publishing to shinyapps, this data file has to be uploaded too
 data <- rio::import("https://covid.ourworldindata.org/data/owid-covid-data.csv") #data will be downloaded from the internet
 
 #json source https://github.com/datasets/geo-countries/blob/master/data/countries.geojson
-#countries_json <- geojson_read("data/countries.geojson", what = "sp")
 countries_json <- geojson_read("data_shinyapps/countries.geojson", what = "sp") #when publishing to shinyapps
 
 #shapefile map data, source http://thematicmapping.org/downloads/world_borders.php, requires library(rgdal)
@@ -38,7 +36,7 @@ data <- data %>%
          week_rel_new_inc_wago = lag(week_rel_new_inc_now, order_by = date, n = 6),
          week_rel_new_inc_wago = ifelse(is.infinite(week_rel_new_inc_wago), NA, week_rel_new_inc_wago),
          avg_week_new_cases = my_trailing_mean(new_cases),
-         adjusted_weekly_increase = (new_cases/new_tests)/(lag(new_cases, order_by = date, n = 7)/lag(new_tests, order_by = date, n = 7)),
+         adjusted_weekly_increase = (new_cases/lag(new_cases, order_by = date, n = 7))^(3/2)*sqrt(lag(new_tests, order_by = date, n = 7)/new_tests),
          adjusted_weekly_increase = ifelse(is.infinite(adjusted_weekly_increase), NA, adjusted_weekly_increase)) %>% 
   ungroup() #could cause some issues further down
 
