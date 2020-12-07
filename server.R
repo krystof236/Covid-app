@@ -9,8 +9,18 @@ library(geojsonio)
 # library(rgdal) #needed for shapefile map format
 
 # data preparation --------------------------------------------------------
-data <- rio::import("data/owid-covid-data.csv") #static data in /data folder
-# data <- rio::import("https://covid.ourworldindata.org/data/owid-covid-data.csv") #
+#data <- rio::import("data/owid-covid-data.csv") #static data in /data folder
+#data <- rio::import("data_shinyapps/owid-covid-data.csv") #when publishing to shinyapps
+data <- rio::import("https://covid.ourworldindata.org/data/owid-covid-data.csv") #data will be downloaded from the internet
+
+#json source https://github.com/datasets/geo-countries/blob/master/data/countries.geojson
+#countries_json <- geojson_read("data/countries.geojson", what = "sp")
+countries_json <- geojson_read("data_shinyapps/countries.geojson", what = "sp") #when publishing to shinyapps
+
+#shapefile map data, source http://thematicmapping.org/downloads/world_borders.php, requires library(rgdal)
+# countries_shapefile <- readOGR(dsn = "data/TM_WORLD_BORDERS",
+#                                layer = "TM_WORLD_BORDERS-0.3",
+#                                verbose = FALSE)
 
 data <- data %>% 
   mutate(date = as.Date(date))
@@ -67,16 +77,6 @@ possible_vars_to_plot <- tribble(
   "Weekly relative increase 1 week ago", "week_rel_new_inc_wago",
   "7-day average of new cases", "avg_week_new_cases",
   "Adjusted weekly increase", "adjusted_weekly_increase")
-
-
-# map data file preparation ---------------------------------------------------
-#json source https://github.com/datasets/geo-countries/blob/master/data/countries.geojson
-countries_json <- geojson_read("data/countries.geojson", what = "sp")
-
-#shapefile source http://thematicmapping.org/downloads/world_borders.php, requires library(rgdal)
-# countries_shapefile <- readOGR(dsn = "data/TM_WORLD_BORDERS",
-#                                layer = "TM_WORLD_BORDERS-0.3",
-#                                verbose = FALSE)
 
 
 # server function definition ----------------------------------------------
