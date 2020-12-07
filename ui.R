@@ -2,6 +2,7 @@ library(shiny)
 library(DT)
 library(highcharter)
 library(plotly)
+library(leaflet)
 
 navbarPage(
     title = "Coronavirus application",
@@ -27,7 +28,9 @@ navbarPage(
              DTOutput("data_drilled_dt")
     ), #tabPanel grouped data
     tabPanel(title = "Map",
-             h3("Data visualization using leaflet package")),
+             uiOutput("max_date_info"),
+             leafletOutput("map", height = 800)
+    ),
     tabPanel(title = "Forecast",
              h3("Forecasting using forecast package")),
     tabPanel(title = "Correlation analysis"),

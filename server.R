@@ -4,10 +4,14 @@ library(ggplot2)
 library(highcharter)
 library(plotly)
 library(scales)
-
+library(leaflet)
+library(geojsonio)
+# library(rgdal) #needed for shapefile map format
 
 # data preparation --------------------------------------------------------
-data <- rio::import("data/owid-covid-data.csv")
+data <- rio::import("data/owid-covid-data.csv") #static data in /data folder
+# data <- rio::import("https://covid.ourworldindata.org/data/owid-covid-data.csv") #
+
 data <- data %>% 
   mutate(date = as.Date(date))
 vars_small <- c("iso_code",
@@ -39,6 +43,17 @@ possible_vars_to_plot <- tribble(
   "New deaths", "new_deaths",
   "Reproduction rate", "reproduction_rate")
 
+
+# map data file preparation ---------------------------------------------------
+#json source https://github.com/datasets/geo-countries/blob/master/data/countries.geojson
+countries_json <- geojson_read("data/countries.geojson", what = "sp")
+
+#shapefile source http://thematicmapping.org/downloads/world_borders.php, requires library(rgdal)
+# countries_shapefile <- readOGR(dsn = "data/TM_WORLD_BORDERS",
+#                                layer = "TM_WORLD_BORDERS-0.3",
+#                                verbose = FALSE)
+
+
 # server function definition ----------------------------------------------
 function(input, output) {
 
@@ -56,7 +71,7 @@ function(input, output) {
     selectInput("mult_vars_to_plot", "Multiple variables to plot", choices = deframe(possible_vars_to_plot), selected = possible_vars_to_plot[1:2,]$value, multiple = T) 
   })
   
-# time series -------------------------------------------------------------
+# time series, using ggplot and plotly -------------------------------------------------------------
   filtered_data <- reactive({
     data %>%
       filter(location %in% input$country)
@@ -121,7 +136,7 @@ function(input, output) {
   })
   
   output$filtered_data_dt <- renderDT(filtered_data_small())
-# drillable highchart and datatable ---------------------------------------
+# drillable elements, bar chart (highcharter) and table (datatable) ---------------------------------------
   data_small_now <- reactive({
     req(input$data_from)
     data_small %>%
@@ -224,4 +239,35 @@ function(input, output) {
       hc_yAxis(title = "") %>% 
       hc_xAxis(title = "")
   })
+
+# map, leaflet ------------------------------------------------------------
+  output$max_date_info <- renderText(paste("Map based on data from ", max_date))
+  
+  data_small_now_map <- data_small %>%
+      filter(date == max_date) %>% 
+      select(iso_code, location, new_cases_per_million, total_cases_per_million)
+  
+  countries_map <- countries_json
+  countries_map@data <- countries_json@data %>% 
+    left_join(data_small_now_map, by = c("ISO_A3" = "iso_code"))
+
+  #function to return color based on new_cases_per_million
+  # my_palette <- colorNumeric(palette = "YlOrBr", domain = countries_map@data$new_cases_per_million, na.color = "transparent")
+  my_bins <- c(0,20,50,100,300,500,1000,Inf)
+  my_palette <- colorBin(palette = "YlOrBr", domain = countries_map@data$new_cases_per_million, na.color = "transparent", bins = my_bins)
+  
+  my_text <- paste(
+      "Country: ", countries_map@data$location,
+      "<br> New cases per M: ", countries_map@data$new_cases_per_million,
+      "<br> Total cases per M: ", countries_map@data$total_cases_per_million
+    ) %>% lapply(htmltools::HTML)
+  
+  output$map <- renderLeaflet({
+    leaflet(countries_map) %>% 
+      addTiles() %>% 
+      setView(lat = 50, lng = 15, zoom = 3) %>% 
+      addPolygons(fillColor = ~my_palette(new_cases_per_million), stroke = F, label = my_text) %>% 
+      addLegend(pal = my_palette, values = ~new_cases_per_million, title = "New cases per M", position = "bottomleft")
+  })
+    
 }
