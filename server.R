@@ -1,16 +1,18 @@
-library(tidyverse)
-library(DT)
-library(ggplot2)
-library(highcharter)
-library(plotly)
-library(scales)
-library(leaflet)
-library(geojsonio)
+library(tidyverse) #for data
+library(DT) #package for interactive tables
+library(ggplot2) #package for graphs
+library(highcharter) #package for interactive graphs
+library(plotly) #package for interactive graphs
+library(scales) #package for various units
+library(leaflet) #package for interactive maps
+library(geojsonio) #package for .geojson file format 
 # library(rgdal) #needed for shapefile map format
+library(forecast) #package for forecasting, will be deprecated in future in favor of fable
+library(lubridate)
 
 # data preparation --------------------------------------------------------
-#data <- rio::import("data_shinyapps/owid-covid-data.csv") #using static data, when publishing to shinyapps, this data file has to be uploaded too
-data <- rio::import("https://covid.ourworldindata.org/data/owid-covid-data.csv") #data will be downloaded from the internet
+data <- rio::import("data_shinyapps/owid-covid-data.csv") #using static data, when publishing to shinyapps, this data file has to be uploaded too
+# data <- rio::import("https://covid.ourworldindata.org/data/owid-covid-data.csv") #data will be downloaded from the internet
 
 #json source https://github.com/datasets/geo-countries/blob/master/data/countries.geojson
 countries_json <- geojson_read("data_shinyapps/countries.geojson", what = "sp") #when publishing to shinyapps
@@ -23,6 +25,7 @@ countries_json <- geojson_read("data_shinyapps/countries.geojson", what = "sp") 
 data <- data %>% 
   mutate(date = as.Date(date))
 max_date <- max(data$date)
+min_date <- min(data$date)
 avail_countries <- data %>% distinct(location) %>% arrange(location)
 
 # adding computed variables -----------------------------------------------
@@ -38,7 +41,7 @@ data <- data %>%
          avg_week_new_cases = my_trailing_mean(new_cases),
          adjusted_weekly_increase = (new_cases/lag(new_cases, order_by = date, n = 7))^(3/2)*sqrt(lag(new_tests, order_by = date, n = 7)/new_tests),
          adjusted_weekly_increase = ifelse(is.infinite(adjusted_weekly_increase), NA, adjusted_weekly_increase)) %>% 
-  ungroup() #could cause some issues further down
+  ungroup() #could cause some issues further down if not ungrouped
 
 # variables for a smaller dataset -----------------------------------------
 vars_small <- c("iso_code",
@@ -77,10 +80,22 @@ possible_vars_to_plot <- tribble(
   "Adjusted weekly increase", "adjusted_weekly_increase")
 
 
+
+# possible models for forecasting -----------------------------------------
+possible_models <- tribble(
+  ~label, ~value,
+  "Naive", "naive",
+  "Simple exponential smoothing", "ses",
+  "Holt", "holt",
+  "ARIMA", "auto.arima",
+  "Exponential smoothing state space model", "ets",
+  "TBATS", "tbats"
+)
+
 # server function definition ----------------------------------------------
 function(input, output) {
 
-# user inputs -------------------------------------------------------------
+# user inputs defined via server -------------------------------------------------------------
   output$country_filter <- renderUI({
     selectInput("country", "Country", choices = avail_countries$location, multiple = T, selected = "Czech Republic")
   })
@@ -92,6 +107,12 @@ function(input, output) {
   })
   output$multiple_vars_to_plot <- renderUI({
     selectInput("mult_vars_to_plot", "Multiple variables to plot", choices = deframe(possible_vars_to_plot), selected = possible_vars_to_plot[1:2,]$value, multiple = T) 
+  })
+  output$var_to_forecast_ui <- renderUI({
+    selectInput("var_to_forecast", "Variable to forecast", choices = deframe(possible_vars_to_plot))
+  })
+  output$chosen_model_ui <- renderUI({
+    selectInput("chosen_model", "Model to use", choices = deframe(possible_models))
   })
   
 # time series, using ggplot and plotly -------------------------------------------------------------
@@ -296,4 +317,49 @@ function(input, output) {
       addLegend(pal = my_palette, values = ~new_cases_per_million, title = "New cases per M", position = "bottomleft")
   })
     
+# forecasting -------------------------------------------------------------
+  n_frequency <- 7
+  
+  data_cz <- data_small %>% filter(location %in% c("Czech Republic"))
+  
+  data_ts <- reactive({
+    ts(data_cz[[input$var_to_forecast]], frequency = n_frequency)
+  })
+  
+  model <- reactive({
+    req(input$chosen_model)
+    if (input$chosen_model %in% c('naive', 'ses', 'holt')) {lapply(data_ts(), input$chosen_model, h = input$n_to_predict)[[1]]} #needs parameter h to be trained
+    else {lapply(data_ts(), input$chosen_model)[[1]]}
+  })
+  
+  output$p_forecast <- renderPlot({
+    req(input$var_to_forecast)
+    var_label <- possible_vars_to_plot %>% filter(value == input$var_to_forecast) %>% select(label) %>% as.character()
+    autoplot(forecast(model(), h = input$n_to_predict))+
+      labs(x = "Date", y = var_label)+
+      scale_y_continuous(labels = comma)
+  })
+  
+  # n_to_predict <- 100
+  # var_to_forecast <- "total_cases"
+  # 
+  # data_ts <- ts(data_cz %>% select(var_to_forecast), start = decimal_date(min_date), frequency = 365)
+  # #data_ts <- ts(data_cz %>% select(var_to_forecast), start = 2020, frequency = 365)
+  # time(data_ts)
+  # my_model <- naive(data_ts, h = n_to_predict)
+  # my_forecast <- forecast(my_model, h=n_to_predict)
+  # test <- as.data.frame(my_forecast)
+  # plot(my_forecast)
+  # 
+  # ggplot(data_cz, aes(x = date, y = total_cases))+
+  #   geom_line()+
+  #   scale_y_continuous(labels = comma)+
+  #   scale_x_date(date_labels = "%Y-%m-%d")+
+  #   geom_forecast(h = n_to_predict, model = my_model)
+  # 
+  # autoplot(my_forecast)+
+  #   scale_y_continuous(labels = comma)+
+  #   scale_x_date(labels = function(x) date(date_decimal(x)))
+  
+  #visualise using ggplot via forecast's function autoplot, ggplotly doesn't handle it though as autoplot uses it's own geom
 }
