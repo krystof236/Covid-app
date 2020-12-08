@@ -318,12 +318,12 @@ function(input, output) {
   })
     
 # forecasting -------------------------------------------------------------
-  n_frequency <- 7
+  n_frequency <- 365
   
   data_cz <- data_small %>% filter(location %in% c("Czech Republic"))
   
   data_ts <- reactive({
-    ts(data_cz[[input$var_to_forecast]], frequency = n_frequency)
+    ts(data_cz[[input$var_to_forecast]], start = decimal_date(min_date), frequency = n_frequency)
   })
   
   model <- reactive({
@@ -332,18 +332,24 @@ function(input, output) {
     else {lapply(data_ts(), input$chosen_model)[[1]]}
   })
   
+  my_date_trans <- function(x) {date(date_decimal(x))}
   output$p_forecast <- renderPlot({
     req(input$var_to_forecast)
     var_label <- possible_vars_to_plot %>% filter(value == input$var_to_forecast) %>% select(label) %>% as.character()
     autoplot(forecast(model(), h = input$n_to_predict))+
       labs(x = "Date", y = var_label)+
       scale_y_continuous(labels = comma)
+      #scale_x_continuous(labels = my_date_trans) #have to sort out wrong shifting, thing it is due to NA values
   })
   
+  #TO DO - implement this above
   # n_to_predict <- 100
   # var_to_forecast <- "total_cases"
   # 
-  # data_ts <- ts(data_cz %>% select(var_to_forecast), start = decimal_date(min_date), frequency = 365)
+  # min_avail_date <- date("2020-03-01")
+  # data_for_ts <- data_cz %>% filter(date >= min_avail_date) %>% select(var_to_forecast) 
+  # 
+  # data_ts <- ts(data_for_ts, start = decimal_date(min_avail_date), frequency = 365)
   # #data_ts <- ts(data_cz %>% select(var_to_forecast), start = 2020, frequency = 365)
   # time(data_ts)
   # my_model <- naive(data_ts, h = n_to_predict)
@@ -351,15 +357,14 @@ function(input, output) {
   # test <- as.data.frame(my_forecast)
   # plot(my_forecast)
   # 
-  # ggplot(data_cz, aes(x = date, y = total_cases))+
+  # ggplot(data_cz, aes(x = decimal_date(date), y = total_cases))+
   #   geom_line()+
-  #   scale_y_continuous(labels = comma)+
-  #   scale_x_date(date_labels = "%Y-%m-%d")+
-  #   geom_forecast(h = n_to_predict, model = my_model)
+  #   scale_y_continuous(labels = comma)
+  #   scale_x_date(date_labels = "%Y-%m-%d")
   # 
   # autoplot(my_forecast)+
   #   scale_y_continuous(labels = comma)+
-  #   scale_x_date(labels = function(x) date(date_decimal(x)))
-  
+  #   scale_x_continuous(labels = my_date_trans)
+  # 
   #visualise using ggplot via forecast's function autoplot, ggplotly doesn't handle it though as autoplot uses it's own geom
 }
