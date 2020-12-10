@@ -97,7 +97,7 @@ function(input, output) {
 
 # user inputs defined via server -------------------------------------------------------------
   output$country_filter <- renderUI({
-    selectInput("country", "Country", choices = avail_countries$location, multiple = T, selected = "Czech Republic")
+    selectInput("country", "Country", choices = avail_countries$location, multiple = T, selected = "Czechia")
   })
   output$possible_vars_to_plot <- renderUI({
     selectInput("var_to_plot", "Variable to plot", choices = deframe(possible_vars_to_plot)) 
@@ -320,10 +320,18 @@ function(input, output) {
 # forecasting -------------------------------------------------------------
   n_frequency <- 365
   
-  data_cz <- data_small %>% filter(location %in% c("Czech Republic"))
+  data_cz <- data_small %>% filter(location == "Czechia")
   
   data_ts <- reactive({
-    ts(data_cz[[input$var_to_forecast]], start = decimal_date(min_date), frequency = n_frequency)
+    min_avail_date_var_tbl <- data_cz %>%
+      select(date, var_to_forecast) %>% 
+      filter(!is.na(.data[[input$var_to_forecast]])) %>% 
+      summarize(first(date))
+    min_avail_date_var <- as.Date(min_avail_date_tbl[[1]])
+    
+    data_for_ts <- data_cz %>% filter(date >= min_avail_date_var) %>% select(input$var_to_forecast)
+    
+    ts(data_for_ts, start = decimal_date(min_avail_date_var), frequency = n_frequency)
   })
   
   model <- reactive({
@@ -338,33 +346,9 @@ function(input, output) {
     var_label <- possible_vars_to_plot %>% filter(value == input$var_to_forecast) %>% select(label) %>% as.character()
     autoplot(forecast(model(), h = input$n_to_predict))+
       labs(x = "Date", y = var_label)+
-      scale_y_continuous(labels = comma)
-      #scale_x_continuous(labels = my_date_trans) #have to sort out wrong shifting, thing it is due to NA values
+      scale_y_continuous(labels = comma)+
+      scale_x_continuous(labels = my_date_trans)
   })
-  
-  #TO DO - implement this above
-  # n_to_predict <- 100
-  # var_to_forecast <- "total_cases"
-  # 
-  # min_avail_date <- date("2020-03-01")
-  # data_for_ts <- data_cz %>% filter(date >= min_avail_date) %>% select(var_to_forecast) 
-  # 
-  # data_ts <- ts(data_for_ts, start = decimal_date(min_avail_date), frequency = 365)
-  # #data_ts <- ts(data_cz %>% select(var_to_forecast), start = 2020, frequency = 365)
-  # time(data_ts)
-  # my_model <- naive(data_ts, h = n_to_predict)
-  # my_forecast <- forecast(my_model, h=n_to_predict)
-  # test <- as.data.frame(my_forecast)
-  # plot(my_forecast)
-  # 
-  # ggplot(data_cz, aes(x = decimal_date(date), y = total_cases))+
-  #   geom_line()+
-  #   scale_y_continuous(labels = comma)
-  #   scale_x_date(date_labels = "%Y-%m-%d")
-  # 
-  # autoplot(my_forecast)+
-  #   scale_y_continuous(labels = comma)+
-  #   scale_x_continuous(labels = my_date_trans)
-  # 
+
   #visualise using ggplot via forecast's function autoplot, ggplotly doesn't handle it though as autoplot uses it's own geom
 }

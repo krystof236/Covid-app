@@ -5,19 +5,6 @@ library(plotly)
 library(leaflet)
 
 navbarPage(
-    tabPanel(title = "Forecast",
-             sidebarLayout(
-                 sidebarPanel(
-                     uiOutput("chosen_model_ui"),
-                     textOutput("test"),
-                     uiOutput("var_to_forecast_ui"),
-                     sliderInput("n_to_predict", "Number of days to forecast", min = 1, max = 150, value = 30)
-                 ),
-                 mainPanel(
-                     plotOutput("p_forecast")    
-                 )
-             )
-    ), #tabPanel forecast
     title = "Coronavirus application",
     tabPanel(title = "Overview",
              sidebarLayout(
@@ -45,6 +32,19 @@ navbarPage(
     tabPanel(title = "Map",
              leafletOutput("map", height = 800)
     ),
+    tabPanel(title = "Forecast",
+             sidebarLayout(
+                 sidebarPanel(
+                     uiOutput("chosen_model_ui"),
+                     textOutput("test"),
+                     uiOutput("var_to_forecast_ui"),
+                     sliderInput("n_to_predict", "Number of days to forecast", min = 1, max = 150, value = 30)
+                 ),
+                 mainPanel(
+                     plotOutput("p_forecast")    
+                 )
+             )
+    ), #tabPanel forecast
     tabPanel(title = "Correlation analysis"),
     tabPanel(title = "Codebook")
 )
