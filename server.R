@@ -112,7 +112,7 @@ function(input, output) {
     selectInput("var_to_forecast", "Variable to forecast", choices = deframe(possible_vars_to_plot))
   })
   output$chosen_model_ui <- renderUI({
-    selectInput("chosen_model", "Model to use", choices = deframe(possible_models))
+    selectInput("chosen_model", "Model to use", choices = deframe(possible_models), selected = "auto.arima")
   })
   output$date_range_ui <- renderUI({
     dateRangeInput("date_range", "Date range", start = min_date, end = max_date, min = min_date, max = max_date)
@@ -355,10 +355,12 @@ function(input, output) {
   output$p_forecast <- renderPlot({
     req(input$var_to_forecast)
     var_label <- possible_vars_to_plot %>% filter(value == input$var_to_forecast) %>% select(label) %>% as.character()
-    autoplot(forecast(model(), h = input$n_to_predict))+
+    temp <- autoplot(forecast(model(), h = input$n_to_predict))+
       labs(x = "Date", y = var_label)+
-      scale_y_continuous(labels = comma)+
       scale_x_continuous(labels = my_date_trans)
+    
+    if (input$scale_type_forecast  == "log") {temp + scale_y_log10(labels = comma)}
+    else {temp+scale_y_continuous(labels = comma)}
   })
 
   #visualise using ggplot via forecast's function autoplot, ggplotly doesn't handle it though as autoplot uses it's own geom

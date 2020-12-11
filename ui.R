@@ -38,9 +38,9 @@ navbarPage(
                  sidebarPanel(
                      uiOutput("country_forecast_ui"),
                      uiOutput("chosen_model_ui"),
-                     textOutput("test"),
                      uiOutput("var_to_forecast_ui"),
-                     sliderInput("n_to_predict", "Number of days to forecast", min = 1, max = 150, value = 30)
+                     sliderInput("n_to_predict", "Number of days to forecast", min = 1, max = 150, value = 30),
+                     radioButtons("scale_type_forecast", "Scale", choices = c("Linear" = "lin", "Logarithmic" = "log")),
                  ),
                  mainPanel(
                      plotOutput("p_forecast")    
