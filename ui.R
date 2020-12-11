@@ -13,6 +13,11 @@ navbarPage(
                      uiOutput("possible_vars_to_plot"),
                      uiOutput("date_range_ui"),
                      radioButtons("scale_type", "Scale", choices = c("Linear" = "lin", "Logarithmic" = "log")),
+                     checkboxInput("ref_line", "Add a reference line", value = F),
+                     conditionalPanel(
+                         condition = "input.ref_line == true",
+                         numericInput("ref_line_value", "Value of the reference line", value = 1)
+                     ),
                      uiOutput("multiple_vars_to_plot"),
                      uiOutput("max_date_info"),
                      tags$a("Source of data", href = "https://github.com/owid/covid-19-data/tree/master/public/data")

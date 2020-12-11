@@ -63,7 +63,6 @@ vars_small <- c("iso_code",
 data_small <- data %>%
   select(all_of(vars_small))
 
-
 # possible variables to plot preparation ----------------------------------
 possible_vars_to_plot <- tribble(
   ~label, ~value,
@@ -76,8 +75,6 @@ possible_vars_to_plot <- tribble(
   "7-day average of new cases", "avg_week_new_cases",
   "7-day average of new tests", "avg_week_new_tests",
   "Adjusted weekly increase", "adjusted_weekly_increase")
-
-
 
 # possible models for forecasting -----------------------------------------
 possible_models <- tribble(
@@ -146,9 +143,12 @@ function(input, output) {
       scale_x_date(date_labels = "%b %Y", date_breaks = "1 month")+
       labs(x = "Date", y = var_label, title = paste0("Single variable - ", var_label," time series"), color = "Country")
     
-    if (input$scale_type == "log") {temp + scale_y_log10(labels = comma)}
+    temp <- if (input$scale_type == "log") {temp + scale_y_log10(labels = comma)}
     else {temp+scale_y_continuous(labels = comma)}
-  })
+    
+    if (input$ref_line) {temp + geom_hline(yintercept = input$ref_line_value)}
+    else {temp}
+  }) #p_cases
   output$p_cases_pl <- renderPlotly({
     req(input$country)
     ggplotly(p_cases(), tooltip = "text")
