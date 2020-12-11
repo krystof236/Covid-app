@@ -11,6 +11,7 @@ navbarPage(
                  sidebarPanel(
                      uiOutput("country_filter"),
                      uiOutput("possible_vars_to_plot"),
+                     uiOutput("date_range_ui"),
                      radioButtons("scale_type", "Scale", choices = c("Linear" = "lin", "Logarithmic" = "log")),
                      uiOutput("multiple_vars_to_plot"),
                      uiOutput("max_date_info"),
@@ -35,6 +36,7 @@ navbarPage(
     tabPanel(title = "Forecast",
              sidebarLayout(
                  sidebarPanel(
+                     uiOutput("country_forecast_ui"),
                      uiOutput("chosen_model_ui"),
                      textOutput("test"),
                      uiOutput("var_to_forecast_ui"),

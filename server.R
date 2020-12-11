@@ -114,13 +114,20 @@ function(input, output) {
   output$chosen_model_ui <- renderUI({
     selectInput("chosen_model", "Model to use", choices = deframe(possible_models))
   })
+  output$date_range_ui <- renderUI({
+    dateRangeInput("date_range", "Date range", start = min_date, end = max_date, min = min_date, max = max_date)
+  })
+  output$country_forecast_ui <- renderUI({
+    selectInput("country_forecast", "Country", choices = avail_countries$location, selected = "Czechia")
+  })
   
 # time series, using ggplot and plotly -------------------------------------------------------------
   filtered_data <- reactive({
-    data %>%
-      filter(location %in% input$country)
+    data %>% filter(location %in% input$country,
+                    date >= input$date_range[[1]],
+                    date <= input$date_range[[2]])
   })
-  
+    
   filtered_data_small <- reactive({
     filtered_data() %>% select(all_of(vars_small))
   })
@@ -154,8 +161,9 @@ function(input, output) {
   p_mult <- reactive({
     req(input$mult_vars_to_plot)
     req(input$country)
+    req(input$date_range)
     my_data <- isolate(filtered_data_small())
-    vars <- isolate(input$mult_vars_to_plot)
+    vars <- input$mult_vars_to_plot
     no_layers <- length(vars)
     
     graphs <- c()
@@ -165,7 +173,7 @@ function(input, output) {
       var_label <- possible_vars_to_plot %>% filter(value == vars[[i]]) %>% select(label) %>% as.character()
       graphs[[i+1]] <- graphs[[i]]+geom_line(aes(y = .data[[vars[[i]]]],
                                                  text = paste0(
-                                                   var_label, ': ', .data[[vars[[i]]]],
+                                                   !!var_label, ': ', .data[[vars[[i]]]], #this !! corrects the issue with tooltips with same var_label
                                                    '<br> Country: ', location,
                                                    '<br> Date: ', date
                                                  )))
@@ -320,16 +328,19 @@ function(input, output) {
 # forecasting -------------------------------------------------------------
   n_frequency <- 365
   
-  data_cz <- data_small %>% filter(location == "Czechia")
+  data_forecast <- reactive({
+    data_small%>%
+      filter(location == input$country_forecast)
+  })
   
   data_ts <- reactive({
-    min_avail_date_var_tbl <- data_cz %>%
-      select(date, var_to_forecast) %>% 
+    min_avail_date_var_tbl <- data_forecast() %>%
+      select(date, input$var_to_forecast) %>% 
       filter(!is.na(.data[[input$var_to_forecast]])) %>% 
       summarize(first(date))
-    min_avail_date_var <- as.Date(min_avail_date_tbl[[1]])
+    min_avail_date_var <- as.Date(min_avail_date_var_tbl[[1]])
     
-    data_for_ts <- data_cz %>% filter(date >= min_avail_date_var) %>% select(input$var_to_forecast)
+    data_for_ts <- data_forecast() %>% filter(date >= min_avail_date_var) %>% select(input$var_to_forecast)
     
     ts(data_for_ts, start = decimal_date(min_avail_date_var), frequency = n_frequency)
   })
