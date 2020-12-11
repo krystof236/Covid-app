@@ -33,13 +33,11 @@ my_trailing_mean <- function(x, n = 7){stats::filter(x, rep(1/n,n), sides = 1)}
 
 data <- data %>%
   group_by(location) %>% 
-  mutate(week_rel_new_inc_now = new_cases/lag(new_cases, order_by = date, n = 7),
-         week_rel_new_inc_now = ifelse(is.infinite(week_rel_new_inc_now), NA, week_rel_new_inc_now),
-         #week_rel_tot_inc_wago = lag(total_cases, order_by = date, n = 6)/lag(total_cases, order_by = date, n = 13),
-         week_rel_new_inc_wago = lag(week_rel_new_inc_now, order_by = date, n = 6),
-         week_rel_new_inc_wago = ifelse(is.infinite(week_rel_new_inc_wago), NA, week_rel_new_inc_wago),
-         avg_week_new_cases = my_trailing_mean(new_cases),
-         adjusted_weekly_increase = (new_cases/lag(new_cases, order_by = date, n = 7))^(3/2)*sqrt(lag(new_tests, order_by = date, n = 7)/new_tests),
+  mutate(avg_week_new_cases = my_trailing_mean(new_cases), #defaultne v datech jako _smoothed
+         avg_week_new_tests = my_trailing_mean(new_tests), #defaultne v datech jako _smoothed
+         week_rel_new_inc = avg_week_new_cases/lag(avg_week_new_cases, order_by = date, n = 7),
+         week_rel_new_inc = ifelse(is.infinite(week_rel_new_inc), NA, week_rel_new_inc),
+         adjusted_weekly_increase = (avg_week_new_cases/lag(avg_week_new_cases, order_by = date, n = 7))^(3/2)*sqrt(lag(avg_week_new_tests, order_by = date, n = 7)/avg_week_new_tests),
          adjusted_weekly_increase = ifelse(is.infinite(adjusted_weekly_increase), NA, adjusted_weekly_increase)) %>% 
   ungroup() #could cause some issues further down if not ungrouped
 
@@ -57,9 +55,9 @@ vars_small <- c("iso_code",
                 "total_deaths_per_million",
                 "new_deaths_per_million",
                 "reproduction_rate",
-                "week_rel_new_inc_now",
-                "week_rel_new_inc_wago",
                 "avg_week_new_cases",
+                "avg_week_new_tests",
+                "week_rel_new_inc",
                 "adjusted_weekly_increase")
 
 data_small <- data %>%
@@ -74,9 +72,9 @@ possible_vars_to_plot <- tribble(
   "Total deaths", "total_deaths",
   "New deaths", "new_deaths",
   "Reproduction rate", "reproduction_rate",
-  "Weekly relative increase", "week_rel_new_inc_now",
-  "Weekly relative increase 1 week ago", "week_rel_new_inc_wago",
+  "Weekly relative increase", "week_rel_new_inc",
   "7-day average of new cases", "avg_week_new_cases",
+  "7-day average of new tests", "avg_week_new_tests",
   "Adjusted weekly increase", "adjusted_weekly_increase")
 
 
