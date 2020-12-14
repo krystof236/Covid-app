@@ -78,7 +78,8 @@ data <- data %>%
          adjusted_weekly_increase = ifelse(is.infinite(adjusted_weekly_increase), NA, adjusted_weekly_increase),
          positive_tests_ratio = new_cases/new_tests,
          active_cases = total_cases-total_recovered-total_deaths,
-         hosp_patients_ratio = hosp_patients/active_cases) %>% 
+         hosp_patients_ratio = hosp_patients/active_cases,
+         reproduction_rate_est = avg_week_new_cases/lag(avg_week_new_cases, order_by = date, n = 5)) %>% 
   ungroup() #could cause some issues further down if not ungrouped
 
 # variables for a smaller dataset -----------------------------------------
@@ -104,7 +105,8 @@ vars_small <- c("iso_code",
                 "active_cases",
                 "total_recovered",
                 "hosp_patients",
-                "hosp_patients_ratio")
+                "hosp_patients_ratio",
+                "reproduction_rate_est")
 
 data_small <- data %>%
   select(all_of(vars_small))
@@ -122,6 +124,7 @@ possible_vars_to_plot <- tribble(
   "Total deaths per M", "total_deaths_per_million",
   "New deaths per M", "new_deaths_per_million",
   "Reproduction rate", "reproduction_rate",
+  "Reproduction rate (estimate)", "reproduction_rate_est",
   "Weekly relative increase", "week_rel_new_inc",
   "7-day average of new cases", "avg_week_new_cases",
   "7-day average of new tests", "avg_week_new_tests",
