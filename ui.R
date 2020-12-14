@@ -60,7 +60,10 @@ navbarPage(
                  )
              )
     ), #tabPanel forecast
-    tabPanel(title = "Correlation analysis"),
+    tabPanel(title = "Correlation analysis",
+             plotOutput("corr_graph"),
+             tags$a("Source of temperature data", href = "http://www.meteo.jankovic.cz/")
+    ),
     tabPanel(title = "Codebook",
              DTOutput("codebook"))
 )

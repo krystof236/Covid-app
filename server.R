@@ -11,7 +11,7 @@ library(forecast) #package for forecasting, will be deprecated in future in favo
 library(lubridate)
 
 # data import --------------------------------------------------------
-deploying_to_shinyapps <- FALSE #files to publish: owid-covid-codebook.csv, countries.geojson
+deploying_to_shinyapps <- TRUE #files to publish: countries.geojson, avg_temperatures_cz.csv, owid-covid-codebook.csv
 #basic data
 data <- if (deploying_to_shinyapps) {rio::import("https://covid.ourworldindata.org/data/owid-covid-data.csv")} else {rio::import("data/owid-covid-data.csv")}
 
@@ -29,6 +29,9 @@ data_recovered_raw <- if (deploying_to_shinyapps) {rio::import("https://raw.gith
 
 #codebook
 codebook <- rio::import("owid-covid-codebook.csv")
+
+#average temperatures in Czech republic, Brno
+avg_temperatures_cz <- rio::import("avg_temperatures_cz.csv")
   
 # data preparation --------------------------------------------------------
 data <- data %>% 
@@ -66,6 +69,7 @@ data_recovered[data_recovered$location == "Taiwan*",]$location <- "Taiwan"
 data <- data %>% 
   left_join(data_recovered, by = c("location", "date"))
 
+avg_temperatures_cz$date <- as.Date(avg_temperatures_cz$date)
 # adding computed variables -----------------------------------------------
 my_trailing_mean <- function(x, n = 7){stats::filter(x, rep(1/n,n), sides = 1)}
 
@@ -112,7 +116,6 @@ vars_small <- c("iso_code",
 data_small <- data %>%
   select(all_of(vars_small))
 
-data_cz <- data_small %>% filter(location == "Czechia")
 # possible variables to plot preparation ----------------------------------
 possible_vars_to_plot <- tribble(
   ~label, ~value,
@@ -495,4 +498,27 @@ observeEvent(input$link_to_codebook, {
     datatable(codebook, options = list(searching = F, paging = F))
   })
   
+# correlation analysis ----------------------------------------------------
+  data_temperature_cz <- data_small %>% 
+    filter(location == "Czechia") %>% 
+    left_join(avg_temperatures_cz, by = c("date")) %>% 
+    mutate(avg_week_temperature = my_trailing_mean(avg_temperature))
+  
+  temp_color <- "red"
+  new_case_color <- "blue"
+  mult_coeff <- 500
+  p_temperature <- ggplot(data_temperature_cz, aes(x = date))+
+    geom_line(aes(y = avg_week_new_cases), color = new_case_color)+
+    geom_line(aes(y = (avg_week_temperature)*mult_coeff), color = temp_color)+
+    scale_y_continuous(
+      name = "Weekly average of new cases",
+      sec.axis = sec_axis(~./mult_coeff, name = "Weekly average temperature (°C)")
+    )+
+    theme(
+      axis.title.y = element_text(color = new_case_color),
+      axis.title.y.right = element_text(color = temp_color)
+    )+
+    scale_x_date(date_labels = "%b %Y", date_breaks = "1 month")
+  
+  output$corr_graph <- renderPlot(p_temperature)
 }
