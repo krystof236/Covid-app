@@ -6,6 +6,7 @@ library(leaflet)
 
 navbarPage(
     title = "Coronavirus application",
+    id = "panels",
     tabPanel(title = "Overview",
              sidebarLayout(
                  sidebarPanel(
@@ -22,7 +23,8 @@ navbarPage(
                      uiOutput("max_date_info"),
                      tags$a("Source of majority of data", href = "https://github.com/owid/covid-19-data/tree/master/public/data"),
                      br(),
-                     tags$a("Source of data about recovered cases", href = "https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_time_series")
+                     tags$a("Source of data about recovered cases", href = "https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_time_series"),
+                     h5("For details please see the ", actionLink("link_to_codebook", "Codebook"), " tab")
                  ),
                  mainPanel(
                      plotlyOutput("p_cases_pl"),
@@ -59,5 +61,6 @@ navbarPage(
              )
     ), #tabPanel forecast
     tabPanel(title = "Correlation analysis"),
-    tabPanel(title = "Codebook")
+    tabPanel(title = "Codebook",
+             DTOutput("codebook"))
 )

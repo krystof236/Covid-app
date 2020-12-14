@@ -10,14 +10,14 @@ library(geojsonio) #package for .geojson file format
 library(forecast) #package for forecasting, will be deprecated in future in favor of fable
 library(lubridate)
 
-# data preparation --------------------------------------------------------
+# data import --------------------------------------------------------
+deploying_to_shinyapps <- FALSE #files to publish: owid-covid-codebook.csv, countries.geojson
 #basic data
-data <- rio::import("data_shinyapps/owid-covid-data.csv") #using static data, when publishing to shinyapps, this data file has to be uploaded too
-# data <- rio::import("https://covid.ourworldindata.org/data/owid-covid-data.csv") #data will be downloaded from the internet
+data <- if (deploying_to_shinyapps) {rio::import("https://covid.ourworldindata.org/data/owid-covid-data.csv")} else {rio::import("data/owid-covid-data.csv")}
 
 #map data
 #json source https://github.com/datasets/geo-countries/blob/master/data/countries.geojson
-countries_json <- geojson_read("data_shinyapps/countries.geojson", what = "sp") #when publishing to shinyapps
+countries_json <- geojson_read("countries.geojson", what = "sp")
 
 #shapefile map data, source http://thematicmapping.org/downloads/world_borders.php, requires library(rgdal)
 # countries_shapefile <- readOGR(dsn = "data/TM_WORLD_BORDERS",
@@ -25,11 +25,12 @@ countries_json <- geojson_read("data_shinyapps/countries.geojson", what = "sp") 
 #                                verbose = FALSE)
 
 #data about recovered patients
-#from a local file
-data_recovered_raw <- rio::import("data/time_series_covid19_recovered_global.csv")
-#from github
-#data_recovered_raw <- rio::import("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_recovered_global.csv")
+data_recovered_raw <- if (deploying_to_shinyapps) {rio::import("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_recovered_global.csv")} else {rio::import("data/time_series_covid19_recovered_global.csv")}
 
+#codebook
+codebook <- rio::import("owid-covid-codebook.csv")
+  
+# data preparation --------------------------------------------------------
 data <- data %>% 
   mutate(date = as.Date(date))
 max_date <- max(data$date)
@@ -147,8 +148,33 @@ possible_models <- tribble(
   "TBATS", "tbats"
 )
 
-# server function definition ----------------------------------------------
-function(input, output) {
+# codebook preparation ----------------------------------------------------
+#corrections
+codebook[1,3] <- "ISO 3166-1 alpha-3 - three-letter country codes"
+
+#adding further variables to the codebook
+my_notice <- "Computed in this application"
+added_variables <- tribble(
+  ~column, ~source, ~description,
+ "total_recovered",
+ "Center for Systems Science and Engineering (CSSE) at John Hopkins University, estimates based on local media reports",
+ "Total number of recovered cases",
+ "avg_week_new_cases", my_notice, "Average of new cases during last 7 days",
+ "avg_week_new_tests", my_notice, "Average of new tests during last 7 days",
+ "week_rel_increase", my_notice, "Ratio of avg_week_new_cases today and week ago",
+ "adjusted_weekly_increase", my_notice,
+ "Our metric for the state of the pandemic taking volume of testing into account, (P2/P1)^(3/2)*(T1/T2)^(1/2),
+ P2 avg_week_new_cases, P1 avg_week_new_cases week ago, T2 avg_week_new_tests, T1 avg_week_new_tests week ago",
+ "positive_tests_ratio", my_notice, "Ratio of new cases and new tests",
+ "active_cases", my_notice, "Currently active cases, computed as total_cases-total_recovered-total_deaths",
+ "hosp_patients_ratio", my_notice, "Ratio of hospitalized patients and active cases",
+ "reproduction_rate_est", my_notice, "An estimate of the reproduction number R, calculated as ratio of avg_week_new_cases and avg_week_new_cases 5 days ago"
+)
+
+codebook <- rbind(codebook, added_variables)
+
+# SERVER FUNCTION DEFINITION----------------------------------------------
+function(input, output, session) {
 
 # user inputs defined via server -------------------------------------------------------------
   output$country_filter <- renderUI({
@@ -178,6 +204,11 @@ function(input, output) {
   output$country_tcbreakup_ui <- renderUI({
     selectInput("country_tcbreakup", "Country", choices = avail_countries$location, selected = "Czechia", multiple = T)
   })
+  
+# navigation in the app ---------------------------------------------------
+observeEvent(input$link_to_codebook, {
+  updateNavbarPage(session, "panels", "Codebook")
+})
   
 # time series, using ggplot and plotly -------------------------------------------------------------
   filtered_data <- reactive({
@@ -459,4 +490,9 @@ function(input, output) {
   output$p_tcbreakup_pl <- renderPlotly({
     ggplotly(p_tcbreakup(), tooltip = "text", height = 600)
   })
+# codebook ----------------------------------------------------------------
+  output$codebook <- renderDT({
+    datatable(codebook, options = list(searching = F, paging = F))
+  })
+  
 }
