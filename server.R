@@ -60,7 +60,8 @@ data <- data %>%
          adjusted_weekly_increase = (avg_week_new_cases/lag(avg_week_new_cases, order_by = date, n = 7))^(3/2)*sqrt(lag(avg_week_new_tests, order_by = date, n = 7)/avg_week_new_tests),
          adjusted_weekly_increase = ifelse(is.infinite(adjusted_weekly_increase), NA, adjusted_weekly_increase),
          positive_tests_ratio = new_cases/new_tests,
-         active_cases = total_cases-total_recovered) %>% 
+         active_cases = total_cases-total_recovered-total_deaths,
+         hosp_patients_ratio = hosp_patients/active_cases) %>% 
   ungroup() #could cause some issues further down if not ungrouped
 
 # variables for a smaller dataset -----------------------------------------
@@ -84,11 +85,14 @@ vars_small <- c("iso_code",
                 "positive_tests_ratio",
                 "positive_rate",
                 "active_cases",
-                "total_recovered")
+                "total_recovered",
+                "hosp_patients",
+                "hosp_patients_ratio")
 
 data_small <- data %>%
   select(all_of(vars_small))
 
+data_cz <- data_small %>% filter(location == "Czechia")
 # possible variables to plot preparation ----------------------------------
 possible_vars_to_plot <- tribble(
   ~label, ~value,
@@ -104,7 +108,9 @@ possible_vars_to_plot <- tribble(
   "Positive tests ratio (computed)", "positive_tests_ratio",
   "Positive tests ratio (reported)", "positive_rate",
   "Active cases", "active_cases",
-  "Total recovered", "total_recovered")
+  "Total recovered", "total_recovered",
+  "Hospitalized patients", "hosp_patients",
+  "Hospitalized patients ratio", "hosp_patients_ratio")
 
 # possible models for forecasting -----------------------------------------
 possible_models <- tribble(
@@ -144,6 +150,9 @@ function(input, output) {
   })
   output$country_forecast_ui <- renderUI({
     selectInput("country_forecast", "Country", choices = avail_countries$location, selected = "Czechia")
+  })
+  output$country_tcbreakup_ui <- renderUI({
+    selectInput("country_tcbreakup", "Country", choices = avail_countries$location, selected = "Czechia", multiple = T)
   })
   
 # time series, using ggplot and plotly -------------------------------------------------------------
@@ -394,4 +403,36 @@ function(input, output) {
   })
 
   #visualise using ggplot via forecast's function autoplot, ggplotly doesn't handle it though as autoplot uses it's own geom
+# total cases break-up ----------------------------------------------------
+  cols <- c("total_recovered" = "green", "active_cases" = "blue", "total_deaths" = "red")
+  data_tcbreakup <- reactive({
+    req(input$country_tcbreakup)
+    data_small %>% 
+      filter(location %in% input$country_tcbreakup) %>% 
+      select(date, active_cases, total_deaths, total_recovered)
+  })
+  
+  data_tcbreakup_long <- reactive({
+    data_tcbreakup() %>% 
+      pivot_longer(cols = c(active_cases, total_deaths, total_recovered), names_to = "cases_type", values_to = "value") %>% 
+      mutate(cases_type = fct_reorder(as.factor(cases_type), desc(cases_type)))
+  })
+  
+  p_tcbreakup <- reactive({
+    ggplot(data_tcbreakup_long(), aes(x = date, y = value, fill = cases_type,
+                                    text = paste0(
+                                      "Date: ", date,
+                                      "<br>Number of cases: ", value,
+                                      "<br>Cases type: ", cases_type
+                                    )))+
+      geom_col()+
+      scale_fill_manual(values = cols)+
+      labs(fill = "Cases type", x = "Date", y = "Number of cases")+
+      scale_y_continuous(labels = comma)+
+      scale_x_date(date_labels = "%b %Y", date_breaks = "1 month")
+  })
+  
+  output$p_tcbreakup_pl <- renderPlotly({
+    ggplotly(p_tcbreakup(), tooltip = "text")
+  })
 }

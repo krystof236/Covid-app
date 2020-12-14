@@ -31,6 +31,10 @@ navbarPage(
                  )
              )
     ), #tabPanel overview
+    tabPanel(title = "Total cases break-up",
+             uiOutput("country_tcbreakup_ui"),
+             plotlyOutput("p_tcbreakup_pl")
+    ), #tabPanel total cases break-up
     tabPanel(title = "Grouped data",
              uiOutput("base_on_data_from"),
              highchartOutput("data_drill_hchart"),
