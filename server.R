@@ -11,9 +11,11 @@ library(forecast) #package for forecasting, will be deprecated in future in favo
 library(lubridate)
 
 # data preparation --------------------------------------------------------
+#basic data
 data <- rio::import("data_shinyapps/owid-covid-data.csv") #using static data, when publishing to shinyapps, this data file has to be uploaded too
 # data <- rio::import("https://covid.ourworldindata.org/data/owid-covid-data.csv") #data will be downloaded from the internet
 
+#map data
 #json source https://github.com/datasets/geo-countries/blob/master/data/countries.geojson
 countries_json <- geojson_read("data_shinyapps/countries.geojson", what = "sp") #when publishing to shinyapps
 
@@ -42,7 +44,22 @@ data_recovered <- data_recovered_raw %>%
   mutate(date = as.Date(date, format = "%m/%d/%y")) %>% 
   rename(location = `Country/Region`) %>% 
   group_by(location, date) %>% 
-  summarize(total_recovered = sum(total_recovered))
+  summarize(total_recovered = sum(total_recovered)) %>% 
+  ungroup()
+
+data_recovered_world <- data_recovered %>% 
+  group_by(date) %>% 
+  summarise(total_recovered = sum(total_recovered)) %>% 
+  mutate(location = "World") %>% 
+  ungroup()
+
+data_recovered <- rbind(data_recovered, data_recovered_world)
+  
+#names of locations corrections
+data_recovered[data_recovered$location == "US",]$location <- "United States"
+data_recovered[data_recovered$location == "Cabo Verde",]$location <- "Cape Verde"
+data_recovered[data_recovered$location == "Korea, South",]$location <- "South Korea"
+data_recovered[data_recovered$location == "Taiwan*",]$location <- "Taiwan"
 
 #adding total_recovered to main data
 data <- data %>% 
@@ -433,6 +450,6 @@ function(input, output) {
   })
   
   output$p_tcbreakup_pl <- renderPlotly({
-    ggplotly(p_tcbreakup(), tooltip = "text")
+    ggplotly(p_tcbreakup(), tooltip = "text", height = 600)
   })
 }
