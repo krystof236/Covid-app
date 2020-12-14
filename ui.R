@@ -20,7 +20,9 @@ navbarPage(
                      ),
                      uiOutput("multiple_vars_to_plot"),
                      uiOutput("max_date_info"),
-                     tags$a("Source of data", href = "https://github.com/owid/covid-19-data/tree/master/public/data")
+                     tags$a("Source of majority of data", href = "https://github.com/owid/covid-19-data/tree/master/public/data"),
+                     br(),
+                     tags$a("Source of data about recovered cases", href = "https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_time_series")
                  ),
                  mainPanel(
                      plotlyOutput("p_cases_pl"),

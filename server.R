@@ -22,11 +22,31 @@ countries_json <- geojson_read("data_shinyapps/countries.geojson", what = "sp") 
 #                                layer = "TM_WORLD_BORDERS-0.3",
 #                                verbose = FALSE)
 
+#data about recovered patients
+#from a local file
+data_recovered_raw <- rio::import("data/time_series_covid19_recovered_global.csv")
+#from github
+#data_recovered_raw <- rio::import("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_recovered_global.csv")
+
 data <- data %>% 
   mutate(date = as.Date(date))
 max_date <- max(data$date)
 min_date <- min(data$date)
 avail_countries <- data %>% distinct(location) %>% arrange(location)
+
+#converting data_recovered_raw into a long format and data manipulation
+to_pivot <- colnames(data_recovered_raw)[5:ncol(data_recovered_raw)]
+data_recovered <- data_recovered_raw %>% 
+  select(-Lat, -Long) %>% 
+  pivot_longer(cols = all_of(to_pivot), names_to = "date", values_to = "total_recovered") %>% 
+  mutate(date = as.Date(date, format = "%m/%d/%y")) %>% 
+  rename(location = `Country/Region`) %>% 
+  group_by(location, date) %>% 
+  summarize(total_recovered = sum(total_recovered))
+
+#adding total_recovered to main data
+data <- data %>% 
+  left_join(data_recovered, by = c("location", "date"))
 
 # adding computed variables -----------------------------------------------
 my_trailing_mean <- function(x, n = 7){stats::filter(x, rep(1/n,n), sides = 1)}
@@ -38,7 +58,9 @@ data <- data %>%
          week_rel_new_inc = avg_week_new_cases/lag(avg_week_new_cases, order_by = date, n = 7),
          week_rel_new_inc = ifelse(is.infinite(week_rel_new_inc), NA, week_rel_new_inc),
          adjusted_weekly_increase = (avg_week_new_cases/lag(avg_week_new_cases, order_by = date, n = 7))^(3/2)*sqrt(lag(avg_week_new_tests, order_by = date, n = 7)/avg_week_new_tests),
-         adjusted_weekly_increase = ifelse(is.infinite(adjusted_weekly_increase), NA, adjusted_weekly_increase)) %>% 
+         adjusted_weekly_increase = ifelse(is.infinite(adjusted_weekly_increase), NA, adjusted_weekly_increase),
+         positive_tests_ratio = new_cases/new_tests,
+         active_cases = total_cases-total_recovered) %>% 
   ungroup() #could cause some issues further down if not ungrouped
 
 # variables for a smaller dataset -----------------------------------------
@@ -58,7 +80,11 @@ vars_small <- c("iso_code",
                 "avg_week_new_cases",
                 "avg_week_new_tests",
                 "week_rel_new_inc",
-                "adjusted_weekly_increase")
+                "adjusted_weekly_increase",
+                "positive_tests_ratio",
+                "positive_rate",
+                "active_cases",
+                "total_recovered")
 
 data_small <- data %>%
   select(all_of(vars_small))
@@ -74,7 +100,11 @@ possible_vars_to_plot <- tribble(
   "Weekly relative increase", "week_rel_new_inc",
   "7-day average of new cases", "avg_week_new_cases",
   "7-day average of new tests", "avg_week_new_tests",
-  "Adjusted weekly increase", "adjusted_weekly_increase")
+  "Adjusted weekly increase", "adjusted_weekly_increase",
+  "Positive tests ratio (computed)", "positive_tests_ratio",
+  "Positive tests ratio (reported)", "positive_rate",
+  "Active cases", "active_cases",
+  "Total recovered", "total_recovered")
 
 # possible models for forecasting -----------------------------------------
 possible_models <- tribble(
@@ -118,6 +148,8 @@ function(input, output) {
   
 # time series, using ggplot and plotly -------------------------------------------------------------
   filtered_data <- reactive({
+    req(input$country)
+    req(input$date_range)
     data %>% filter(location %in% input$country,
                     date >= input$date_range[[1]],
                     date <= input$date_range[[2]])
