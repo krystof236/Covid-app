@@ -11,7 +11,9 @@ library(forecast) #package for forecasting, will be deprecated in future in favo
 library(lubridate)
 
 # data import --------------------------------------------------------
-deploying_to_shinyapps <- FALSE #files to publish: countries.geojson, avg_temperatures_cz.csv, owid-covid-codebook.csv
+deploying_to_shinyapps <- FALSE
+#files to publish: countries.geojson, avg_temperatures_cz.csv, owid-covid-codebook.csv, CIS0109_cs.csv, cz_nuts_systematicka_cast.xlsx
+
 #basic data
 data <- if (deploying_to_shinyapps) {rio::import("https://covid.ourworldindata.org/data/owid-covid-data.csv")} else {rio::import("data/owid-covid-data.csv")}
 
