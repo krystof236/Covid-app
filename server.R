@@ -11,7 +11,7 @@ library(forecast) #package for forecasting, will be deprecated in future in favo
 library(lubridate)
 
 # data import --------------------------------------------------------
-deploying_to_shinyapps <- TRUE #files to publish: countries.geojson, avg_temperatures_cz.csv, owid-covid-codebook.csv
+deploying_to_shinyapps <- FALSE #files to publish: countries.geojson, avg_temperatures_cz.csv, owid-covid-codebook.csv
 #basic data
 data <- if (deploying_to_shinyapps) {rio::import("https://covid.ourworldindata.org/data/owid-covid-data.csv")} else {rio::import("data/owid-covid-data.csv")}
 
@@ -32,7 +32,17 @@ codebook <- rio::import("owid-covid-codebook.csv")
 
 #average temperatures in Czech republic, Brno
 avg_temperatures_cz <- rio::import("avg_temperatures_cz.csv")
-  
+
+#data for Czech republic by area
+kraj_okres_cz <- if (deploying_to_shinyapps) {rio::import("https://onemocneni-aktualne.mzcr.cz/api/v2/covid-19/kraj-okres-nakazeni-vyleceni-umrti.csv")} else {rio::import("data/kraj-okres-nakazeni-vyleceni-umrti.csv")}
+okres_cis <- rio::import("CIS0109_cs.csv") %>%
+  select(CHODNOTA, TEXT) %>% 
+  rename(okres_lau_kod = CHODNOTA, okres_nazev = TEXT)
+kraj_cis <- rio::import("cz_nuts_systematicka_cast.xlsx", which = 6) %>%
+  select(Kód, 'NUTS 3') %>% 
+  rename(kraj_nazev = 'NUTS 3', kraj_nuts_kod = Kód) %>% 
+  filter(!is.na(kraj_nazev), !is.na(kraj_nuts_kod))
+
 # data preparation --------------------------------------------------------
 data <- data %>% 
   mutate(date = as.Date(date))
@@ -70,6 +80,9 @@ data <- data %>%
   left_join(data_recovered, by = c("location", "date"))
 
 avg_temperatures_cz$date <- as.Date(avg_temperatures_cz$date)
+
+kraj_okres_cz$datum <- as.Date(kraj_okres_cz$datum)
+
 # adding computed variables -----------------------------------------------
 my_trailing_mean <- function(x, n = 7){stats::filter(x, rep(1/n,n), sides = 1)}
 
@@ -206,6 +219,12 @@ function(input, output, session) {
   })
   output$country_tcbreakup_ui <- renderUI({
     selectInput("country_tcbreakup", "Country", choices = avail_countries$location, selected = "Czechia", multiple = T)
+  })
+  output$cz_detail_level_ui <- renderUI({
+    req(input$level)
+    avail_level <- if (input$level == "kraj") {kraj_cis %>% select(kraj_nazev, kraj_nuts_kod)} else {okres_cis %>% select(okres_nazev, okres_lau_kod)}
+    filter_label <- if (input$level == "kraj") {"Kraj"} else {"Okres"}
+    selectInput("level_filter", filter_label, deframe(avail_level), multiple = T)
   })
   
 # navigation in the app ---------------------------------------------------
@@ -521,4 +540,34 @@ observeEvent(input$link_to_codebook, {
     scale_x_date(date_labels = "%b %Y", date_breaks = "1 month")
   
   output$corr_graph <- renderPlot(p_temperature)
+# czech republic by area --------------------------------------------------
+  data_kraj_cz <- kraj_okres_cz %>% 
+    group_by(kraj_nuts_kod, datum) %>% 
+    summarise(kumulativni_pocet_nakazenych = sum(kumulativni_pocet_nakazenych),
+              kumulativni_pocet_vylecenych = sum(kumulativni_pocet_vylecenych),
+              kumulativni_pocet_umrti = sum(kumulativni_pocet_umrti)) %>% 
+    ungroup()
+  
+  p_cz_detail <- reactive({
+    req(input$level_filter)
+    if (input$level == "kraj") {
+      data_filtered <- data_kraj_cz %>%
+        filter(kraj_nuts_kod %in% input$level_filter)
+      color_var <- "kraj_nuts_kod"
+      level_label <- "Kraj"
+    } else {
+      data_filtered <- kraj_okres_cz %>% 
+        filter(okres_lau_kod %in% input$level_filter)
+      color_var <- "okres_lau_kod"
+      level_label = "Okres"
+      } #end else
+    
+    ggplot(data_filtered, aes(x = datum, y = kumulativni_pocet_nakazenych, color = .data[[color_var]]))+
+      geom_line()+
+      labs(x = "Datum", y = "Kumulativni pocet pripadu", color = "Okres")
+  })
+  
+  output$p_cz_detail_pl <- renderPlotly({
+    p_cz_detail()
+  })
 }

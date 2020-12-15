@@ -7,6 +7,11 @@ library(leaflet)
 navbarPage(
     title = "Coronavirus application",
     id = "panels",
+    tabPanel(title = "Czech republic detail",
+             radioButtons("level", "Level", choices = c("Kraj" = "kraj", "Okres" = "okres")),
+             uiOutput("cz_detail_level_ui"),
+             plotlyOutput("p_cz_detail_pl")
+    ), #tabPanel Czech republic detail
     tabPanel(title = "Overview",
              sidebarLayout(
                  sidebarPanel(
