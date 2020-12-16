@@ -37,7 +37,7 @@ avg_temperatures_cz <- rio::import("avg_temperatures_cz.csv")
 
 #data for Czech republic by area
 kraj_okres_cz <- if (deploying_to_shinyapps) {rio::import("https://onemocneni-aktualne.mzcr.cz/api/v2/covid-19/kraj-okres-nakazeni-vyleceni-umrti.csv")} else {rio::import("data/kraj-okres-nakazeni-vyleceni-umrti.csv")}
-okres_cis <- rio::import("CIS0109_CS.csv") %>%
+okres_cis <- read_csv("CIS0109_CS.csv", locale = locale(encoding = "windows-1250")) %>%
   select(CHODNOTA, TEXT) %>% 
   rename(okres_lau_kod = CHODNOTA, okres_nazev = TEXT)
 kraj_cis <- rio::import("cz_nuts_systematicka_cast.xlsx", which = 6) %>%
