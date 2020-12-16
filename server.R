@@ -546,6 +546,9 @@ observeEvent(input$link_to_codebook, {
     scale_x_date(date_labels = "%b %Y", date_breaks = "1 month")
   
   output$corr_graph <- renderPlot(p_temperature)
+  
+  max_date_temp <- max(data_temperature_cz$date)
+  output$max_date_temp_notice <- renderText(paste0("Temperature data available for Czech republic only so far, updated on ", max_date_temp))
 # czech republic by area --------------------------------------------------
   data_kraj_cz <- kraj_okres_cz %>% 
     group_by(kraj_nuts_kod, kraj_nazev, datum) %>% 
