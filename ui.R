@@ -8,9 +8,22 @@ navbarPage(
     title = "Coronavirus application",
     id = "panels",
     tabPanel(title = "Czech republic detail",
-             radioButtons("level", "Level", choices = c("Kraj" = "kraj", "Okres" = "okres")),
-             uiOutput("cz_detail_level_ui"),
-             plotlyOutput("p_cz_detail_pl")
+             sidebarLayout(
+                 sidebarPanel(
+                     radioButtons("level", "Detail", choices = c("Kraj" = "kraj", "Okres" = "okres"), inline = T),
+                     uiOutput("cz_kraj_level_ui"),
+                     uiOutput("cz_okres_level_ui"),
+                     conditionalPanel(condition = "input.level == 'okres'",
+                                      actionButton("fill_okres", "Vypln okresy dle kraju")),
+                     actionButton("apply_filters_cz_detail", "Apply"),
+                     uiOutput("max_date_cz_notice"),
+                     tags$a("Datovy zdroj", href = "https://onemocneni-aktualne.mzcr.cz/api/v2/covid-19")
+                 ),
+                 mainPanel(
+                     highchartOutput("bar_cz_detail"),
+                     plotlyOutput("p_cz_detail_pl")
+                 )
+             ),
     ), #tabPanel Czech republic detail
     tabPanel(title = "Overview",
              sidebarLayout(

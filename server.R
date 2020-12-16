@@ -84,6 +84,9 @@ data <- data %>%
 avg_temperatures_cz$date <- as.Date(avg_temperatures_cz$date)
 
 kraj_okres_cz$datum <- as.Date(kraj_okres_cz$datum)
+kraj_okres_cz <- kraj_okres_cz %>% 
+  left_join(kraj_cis, by = c("kraj_nuts_kod")) %>% 
+  left_join(okres_cis, by = c("okres_lau_kod"))
 
 # adding computed variables -----------------------------------------------
 my_trailing_mean <- function(x, n = 7){stats::filter(x, rep(1/n,n), sides = 1)}
@@ -222,13 +225,14 @@ function(input, output, session) {
   output$country_tcbreakup_ui <- renderUI({
     selectInput("country_tcbreakup", "Country", choices = avail_countries$location, selected = "Czechia", multiple = T)
   })
-  output$cz_detail_level_ui <- renderUI({
-    req(input$level)
-    avail_level <- if (input$level == "kraj") {kraj_cis %>% select(kraj_nazev, kraj_nuts_kod)} else {okres_cis %>% select(okres_nazev, okres_lau_kod)}
-    filter_label <- if (input$level == "kraj") {"Kraj"} else {"Okres"}
-    selectInput("level_filter", filter_label, deframe(avail_level), multiple = T)
+  output$cz_kraj_level_ui <- renderUI({
+    selectInput("kraj_filter", "Kraj", deframe(kraj_cis %>% select(kraj_nazev, kraj_nuts_kod)), selected = "CZ010", multiple = T)
   })
-  
+  output$cz_okres_level_ui <- renderUI({
+    req(input$level == "okres")
+    selectInput("okres_filter", "Okres", deframe(okres_cis %>% select(okres_nazev, okres_lau_kod)), multiple = T)
+  })
+
 # navigation in the app ---------------------------------------------------
 observeEvent(input$link_to_codebook, {
   updateNavbarPage(session, "panels", "Codebook")
@@ -544,32 +548,80 @@ observeEvent(input$link_to_codebook, {
   output$corr_graph <- renderPlot(p_temperature)
 # czech republic by area --------------------------------------------------
   data_kraj_cz <- kraj_okres_cz %>% 
-    group_by(kraj_nuts_kod, datum) %>% 
+    group_by(kraj_nuts_kod, kraj_nazev, datum) %>% 
     summarise(kumulativni_pocet_nakazenych = sum(kumulativni_pocet_nakazenych),
               kumulativni_pocet_vylecenych = sum(kumulativni_pocet_vylecenych),
               kumulativni_pocet_umrti = sum(kumulativni_pocet_umrti)) %>% 
     ungroup()
   
-  p_cz_detail <- reactive({
-    req(input$level_filter)
+  observeEvent(input$fill_okres, {
+    kraje <- input$kraj_filter
+    updateSelectInput(session, "okres_filter",
+                      selected = okres_cis %>% select(okres_lau_kod) %>% filter(substr(okres_lau_kod,1,5) %in% kraje) %>% deframe()
+    )
+  }) #fill of okres_filter based on kraje_filter values
+  
+  p_cz_detail <- eventReactive(input$apply_filters_cz_detail, {
+    req(input$level)
     if (input$level == "kraj") {
       data_filtered <- data_kraj_cz %>%
-        filter(kraj_nuts_kod %in% input$level_filter)
-      color_var <- "kraj_nuts_kod"
-      level_label <- "Kraj"
+        filter(kraj_nuts_kod %in% input$kraj_filter)
+      color_var <- "kraj_nazev"
+      group_var <- "kraj_nuts_kod"
+      color_label <- "Kraj"
+      group_label <- "Kod kraje"
     } else {
-      data_filtered <- kraj_okres_cz %>% 
-        filter(okres_lau_kod %in% input$level_filter)
-      color_var <- "okres_lau_kod"
-      level_label = "Okres"
+      data_filtered <- kraj_okres_cz %>%
+        filter(okres_lau_kod %in% input$okres_filter)
+      color_var <- "okres_nazev"
+      group_var <- "okres_lau_kod"
+      color_label <- "Okres"
+      group_label <- "Kod okresu"
       } #end else
-    
-    ggplot(data_filtered, aes(x = datum, y = kumulativni_pocet_nakazenych, color = .data[[color_var]]))+
-      geom_line()+
-      labs(x = "Datum", y = "Kumulativni pocet pripadu", color = "Okres")
+
+    ggplot(data = data_filtered, aes(x = datum, y = kumulativni_pocet_nakazenych, group = .data[[group_var]], color = .data[[color_var]]))+
+      geom_line(aes(text = paste0('Datum: ', datum,
+                                  '<br>Kumulativni pocet nakazenych: ', kumulativni_pocet_nakazenych,
+                                  '<br>', color_label, ': ', .data[[color_var]],
+                                  '<br>', group_label, ': ', .data[[group_var]])))+
+      labs(x = "Datum", y = "Kumulativni pocet nakazenych", color = color_label)+
+      scale_x_date(date_labels = "%b %Y", date_breaks = "1 month")
   })
   
   output$p_cz_detail_pl <- renderPlotly({
-    p_cz_detail()
+    ggplotly(p_cz_detail(), tooltip = "text")
+  })
+  
+  max_date_cz <- max(kraj_okres_cz$datum)
+  output$max_date_cz_notice <- renderText(paste0("Data zverejnovana s tydenni periodou, aktualni data z ", max_date_cz))
+  
+  data_kraj_cz_now <- data_kraj_cz %>% 
+    filter(datum == max_date_cz)
+  
+  kraj_okres_cz_now <- kraj_okres_cz %>% 
+    filter(datum == max_date_cz)
+  
+  output$bar_cz_detail <- renderHighchart({
+    req(input$level)
+    if (input$level == "kraj") {
+      data <- data_kraj_cz_now
+      x_var <- "kraj_nazev"
+      x_label <- "Nazev kraje"
+    } else {
+      data <- kraj_okres_cz_now
+      x_var <- "okres_nazev"
+      x_label <- "Nazev okresu"
+    } #end else
+    
+    hchart(
+      data,
+      "column",
+      hcaes(x = .data[[x_var]], y = kumulativni_pocet_nakazenych, name = datum, color = kraj_nuts_kod),
+      name = "Kumulativni pocet nakazenych",
+      colorByPoint = TRUE
+    ) %>% 
+      hc_yAxis(title = list(text = "Kumulativni pocet nakazenych")) %>% 
+      hc_xAxis(title = list(text = x_label))
   })
 }
+
