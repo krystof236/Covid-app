@@ -11,7 +11,7 @@ library(forecast) #package for forecasting, will be deprecated in future in favo
 library(lubridate)
 
 # data import --------------------------------------------------------
-deploying_to_shinyapps <- FALSE
+deploying_to_shinyapps <- TRUE
 #files to publish: countries.geojson, avg_temperatures_cz.csv, owid-covid-codebook.csv, CIS0109_cs.csv, cz_nuts_systematicka_cast.xlsx
 
 #basic data
@@ -87,6 +87,9 @@ kraj_okres_cz$datum <- as.Date(kraj_okres_cz$datum)
 kraj_okres_cz <- kraj_okres_cz %>% 
   left_join(kraj_cis, by = c("kraj_nuts_kod")) %>% 
   left_join(okres_cis, by = c("okres_lau_kod"))
+
+max_date_cz <- max(kraj_okres_cz$datum)
+min_date_cz <- min(kraj_okres_cz$datum)
 
 # adding computed variables -----------------------------------------------
 my_trailing_mean <- function(x, n = 7){stats::filter(x, rep(1/n,n), sides = 1)}
@@ -232,7 +235,10 @@ function(input, output, session) {
     req(input$level == "okres")
     selectInput("okres_filter", "Okres", deframe(okres_cis %>% select(okres_nazev, okres_lau_kod)), multiple = T)
   })
-
+  output$base_cz_detail_on_data_from_ui <- renderUI({
+    dateInput("base_cz_detail_on_data_from", "Datum, ke kteremu vizualizovat barchart", value = max_date_cz, max = max_date_cz, min = min_date_cz)
+  })
+  
 # navigation in the app ---------------------------------------------------
 observeEvent(input$link_to_codebook, {
   updateNavbarPage(session, "panels", "Codebook")
@@ -418,11 +424,11 @@ observeEvent(input$link_to_codebook, {
   })
 
 # map, leaflet ------------------------------------------------------------
-  output$max_date_info <- renderText(paste("Data from ", max_date))
+  output$max_date_info <- renderText(paste("Data from ", max_date-1)) #because with max_date there is sometimes bad data, TODO date filter for the map
   
   data_small_now_map <- data_small %>%
-      filter(date == max_date) %>% 
-      select(iso_code, location, new_cases_per_million, total_cases_per_million)
+    filter(date == max_date-1) %>% 
+    select(iso_code, location, new_cases_per_million, total_cases_per_million)
   
   countries_map <- countries_json
   countries_map@data <- countries_json@data %>% 
@@ -595,34 +601,46 @@ observeEvent(input$link_to_codebook, {
     ggplotly(p_cz_detail(), tooltip = "text")
   })
   
-  max_date_cz <- max(kraj_okres_cz$datum)
   output$max_date_cz_notice <- renderText(paste0("Data zverejnovana s tydenni periodou, aktualni data z ", max_date_cz))
   
-  data_kraj_cz_now <- data_kraj_cz %>% 
-    filter(datum == max_date_cz)
+  data_kraj_cz_now <- reactive({
+    data_kraj_cz %>% 
+      filter(datum == input$base_cz_detail_on_data_from)
+  })
   
-  kraj_okres_cz_now <- kraj_okres_cz %>% 
-    filter(datum == max_date_cz)
+  kraj_okres_cz_now <- reactive({
+    kraj_okres_cz %>% 
+      filter(datum == input$base_cz_detail_on_data_from)
+  })
   
   output$bar_cz_detail <- renderHighchart({
     req(input$level)
+    req(input$base_cz_detail_on_data_from)
     if (input$level == "kraj") {
-      data <- data_kraj_cz_now
+      data <- data_kraj_cz_now()
       x_var <- "kraj_nazev"
       x_label <- "Nazev kraje"
     } else {
-      data <- kraj_okres_cz_now
+      data <- kraj_okres_cz_now()
       x_var <- "okres_nazev"
       x_label <- "Nazev okresu"
     } #end else
     
+    tooltip_category_text <- c("Kumulativni pocet nakazenych: ", "Kraj: ")
+    tooltip_formatted_values <- c("{point.kumulativni_pocet_nakazenych}", "{point.kraj_nazev}")
+    my_tooltips <- tooltip_table(tooltip_category_text, tooltip_formatted_values)
+    
     hchart(
       data,
       "column",
-      hcaes(x = .data[[x_var]], y = kumulativni_pocet_nakazenych, name = datum, color = kraj_nuts_kod),
+      hcaes(x = .data[[x_var]], y = kumulativni_pocet_nakazenych, color = kraj_nuts_kod),
       name = "Kumulativni pocet nakazenych",
       colorByPoint = TRUE
     ) %>% 
+      hc_tooltip(
+        pointFormat = my_tooltips,
+        useHTML = TRUE
+      ) %>% 
       hc_yAxis(title = list(text = "Kumulativni pocet nakazenych")) %>% 
       hc_xAxis(title = list(text = x_label))
   })
