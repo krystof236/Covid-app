@@ -11,7 +11,7 @@ library(forecast) #package for forecasting, will be deprecated in future in favo
 library(lubridate)
 
 # data import --------------------------------------------------------
-deploying_to_shinyapps <- TRUE
+deploying_to_shinyapps <- FALSE
 #files to publish: countries.geojson, avg_temperatures_cz.csv, owid-covid-codebook.csv, CIS0109_cs.csv, cz_nuts_systematicka_cast.xlsx
 
 #basic data
@@ -105,7 +105,8 @@ data <- data %>%
          positive_tests_ratio = new_cases/new_tests,
          active_cases = total_cases-total_recovered-total_deaths,
          hosp_patients_ratio = hosp_patients/active_cases,
-         reproduction_rate_est = avg_week_new_cases/lag(avg_week_new_cases, order_by = date, n = 5)) %>% 
+         reproduction_rate_est = avg_week_new_cases/lag(avg_week_new_cases, order_by = date, n = 5),
+         avg_week_new_cases_per_M = my_trailing_mean(new_cases_per_million)) %>% 
   ungroup() #could cause some issues further down if not ungrouped
 
 # variables for a smaller dataset -----------------------------------------
@@ -123,6 +124,7 @@ vars_small <- c("iso_code",
                 "new_deaths_per_million",
                 "reproduction_rate",
                 "avg_week_new_cases",
+                "avg_week_new_cases_per_M",
                 "avg_week_new_tests",
                 "week_rel_new_inc",
                 "adjusted_weekly_increase",
@@ -152,6 +154,7 @@ possible_vars_to_plot <- tribble(
   "Reproduction rate (estimate)", "reproduction_rate_est",
   "Weekly relative increase", "week_rel_new_inc",
   "7-day average of new cases", "avg_week_new_cases",
+  "7-day average of new cases per M", "avg_week_new_cases_per_M",
   "7-day average of new tests", "avg_week_new_tests",
   "Adjusted weekly increase", "adjusted_weekly_increase",
   "Positive tests ratio (computed)", "positive_tests_ratio",
